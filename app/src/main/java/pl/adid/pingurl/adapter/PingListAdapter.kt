@@ -27,7 +27,8 @@ class PingListAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         if (this.lastVisiblePosition != lastVisiblePosition) {
             this.lastVisiblePosition = lastVisiblePosition
         } else {
-//            itemList.remove(lastVisiblePosition)
+            itemList.remove(lastVisiblePosition)
+            notifyItemRemoved(lastVisiblePosition)
         }
         if (item > maxValue) {
             maxValue = item

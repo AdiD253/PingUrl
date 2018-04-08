@@ -2,6 +2,7 @@ package pl.adid.pingurl
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.Color
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Bundle
@@ -20,6 +21,7 @@ import io.reactivex.rxkotlin.subscribeBy
 import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_main.*
 import pl.adid.pingurl.adapter.PingListAdapter
+import pl.adid.pingurl.api.Api
 import java.lang.Exception
 import java.net.*
 import java.util.concurrent.TimeUnit
@@ -36,7 +38,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sharedPrefs: SharedPreferences
     private var isSubscribed = false
     private var connectionAcquired = true
-    private var timeout: Int = 3000
+    private var timeout: Long = 3000
 
     private val pingListAdapter: PingListAdapter by lazy {
         PingListAdapter()
@@ -96,13 +98,13 @@ class MainActivity : AppCompatActivity() {
                 if (timeoutInput.text.trim().isEmpty())
                     3000
                 else
-                    timeoutInput.text.toString().toInt()
+                    timeoutInput.text.toString().toLong()
         saveInputUrl(url)
         hideKeyboard()
         if (!isSubscribed) {
             isSubscribed = true
             connectionAcquired = true
-            pingUrl(URL("http", url, 80, ""), timeout)
+            pingUrl(url, timeout)
         }
     }
 
@@ -115,10 +117,12 @@ class MainActivity : AppCompatActivity() {
         statusBackground.setBackgroundColor(ContextCompat.getColor(this, R.color.colorPrimaryLight))
     }
 
-    private fun pingUrl(url: URL, timeout: Int) {
+    private fun pingUrl(url: String, timeout: Long) {
+        val api = Api(url, timeout)
         disposable +=
                 Schedulers.io().schedulePeriodicallyDirect({
-                    ping(url, timeout)
+                    val startTime = System.currentTimeMillis().toInt()
+                    api.getVersion()
                             .subscribeOn(Schedulers.io())
                             .observeOn(AndroidSchedulers.mainThread())
                             .subscribeBy(
@@ -132,7 +136,8 @@ class MainActivity : AppCompatActivity() {
                                             tone.startTone(ToneGenerator.TONE_CDMA_SOFT_ERROR_LITE, 1000)
                                         }
                                         when (it) {
-                                            is SocketTimeoutException -> statusPing.text = "SocketTimeout"
+                                            is SocketTimeoutException -> statusError.text = "Timeout"
+                                            else -> statusError.text = it.message
                                         }
                                     },
                                     {
@@ -140,30 +145,16 @@ class MainActivity : AppCompatActivity() {
                                             connectionAcquired = true
                                             tone.startTone(ToneGenerator.TONE_CDMA_EMERGENCY_RINGBACK, 1000)
                                         }
-                                        statusPing.text = "$it ms"
-                                        addItemToList(it)
+                                        val endTime = System.currentTimeMillis().toInt()
+                                        val responseTime = endTime - startTime
+                                        statusPing.text = "$responseTime ms"
+                                        statusError.text = ""
+                                        addItemToList(responseTime)
                                         statusBackground
                                                 .setBackgroundColor(ContextCompat.getColor(this, R.color.colorGreen))
                                     }
                             )
-                }, 0, 1000, TimeUnit.MILLISECONDS)
-    }
-
-    private fun ping(url: URL, timeout: Int): Single<Int> {
-        return Single.create { emitter ->
-            try {
-                val hostAddress: String = InetAddress.getByName(url.host).hostAddress
-                val start = System.currentTimeMillis()
-                val socket = Socket()
-                socket.connect(InetSocketAddress(hostAddress, url.port), timeout)
-                socket.close()
-                val probeFinish = System.currentTimeMillis()
-                emitter.onSuccess((probeFinish - start).toInt())
-            } catch (e: Exception) {
-                e.printStackTrace()
-                emitter.onError(e)
-            }
-        }
+                }, 0, 3000, TimeUnit.MILLISECONDS)
     }
 
     private fun saveInputUrl(url: String) {
