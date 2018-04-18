@@ -13,6 +13,7 @@ import android.support.v7.widget.LinearLayoutManager
 import android.view.Menu
 import android.view.MenuItem
 import android.view.inputmethod.InputMethodManager
+import cat.ereza.customactivityoncrash.config.CaocConfig
 import io.reactivex.Single
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
@@ -25,6 +26,10 @@ import pl.adid.pingurl.api.Api
 import java.lang.Exception
 import java.net.*
 import java.util.concurrent.TimeUnit
+import com.crashlytics.android.Crashlytics
+import io.fabric.sdk.android.Fabric
+
+
 
 
 class MainActivity : AppCompatActivity() {
@@ -49,11 +54,21 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val fabric = Fabric.Builder(this)
+                .kits(Crashlytics())
+                .debuggable(true)
+                .build()
+
+        Fabric.with(fabric)
         setContentView(R.layout.activity_main)
 
         sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this)
         addressInput.setText(getInputUrl())
         initRecycler()
+
+        statusBackground.setOnClickListener {
+            throw NullPointerException()
+        }
     }
 
     override fun onPause() {
